@@ -10,11 +10,8 @@ import type { BacklinkRow, NoteRecord, SearchHit, TagInfo, UnresolvedLink, Vault
  * Rust 端使用 snake_case 命令名 + snake_case 字段名；本文件提供 camelCase 别名。
  */
 
-interface RustTag {
-  /** tuple 序列化为数组：[name, count] */
-  0: string;
-  1: number;
-}
+/** Rust 端 `(String, i64)` 元组序列化为 `[name, count]` 形式的元组。 */
+type RustTagTuple = [string, number];
 
 export const ipc = {
   /** 弹窗选择 / 创建 Vault 目录。取消返回 `null`。 */
@@ -98,7 +95,7 @@ export const ipc = {
    * Rust 端返回 `[name, count]` 元组数组，前端映射为 `TagInfo`。
    */
   listTags: async (): Promise<TagInfo[]> => {
-    const raw = await invoke<RustTag[]>('list_tags');
+    const raw = await invoke<RustTagTuple[]>('list_tags');
     return raw.map(([name, count]) => ({ name, count }));
   },
 

@@ -72,9 +72,13 @@ export function CodeMirrorEditor({
         bracketMatching(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         highlightSelectionMatches(),
-        autocompletion(),
+        autocompletion({
+          // 合并补全源：内置 CodeMirror 词典 + 自定义 [[wiki]] 补全
+          override: [wikiLinkCompletion],
+          closeOnBlur: false,
+          activateOnTyping: true,
+        }),
         markdown({ base: markdownLanguage, codeLanguages: [] }),
-        wikiLinkCompletion,
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
