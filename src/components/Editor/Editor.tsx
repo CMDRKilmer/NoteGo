@@ -29,6 +29,12 @@ export function Editor(): JSX.Element {
       : 'light',
   );
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentRef = useRef(content);
+
+  // 同步 content 到 ref，避免 effect 依赖 content 导致重订阅
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   // 加载笔记
   useEffect(() => {
@@ -57,37 +63,63 @@ export function Editor(): JSX.Element {
 
   // 监听外部修改
   useEffect(() => {
+    if (!activePath) return;
+    let cancelled = false;
     let unlisten: (() => void) | null = null;
     vaultEvents
       .onNoteChanged((e) => {
+        if (cancelled) return;
         if (
           e.type === 'modified' &&
-          e.path === activePath &&
-          activePath
+          'path' in e &&
+          e.path === activePath
         ) {
           ipc
             .readNote(activePath)
             .then((c) => {
-              if (c !== content) {
+              if (cancelled) return;
+              if (c !== contentRef.current) {
                 const ok = window.confirm(
                   '笔记已被外部修改。是否重新加载？\n点击"确定"将丢弃当前未保存的修改。',
                 );
-                if (ok) {
+                if (ok && !cancelled) {
                   setContent(c);
                   setSavedContent(c);
                 }
               }
             })
-            .catch(console.error);
+            .catch((err) => {
+              if (cancelled) return;
+              console.error('[Editor] external readNote failed:', err);
+            });
         }
       })
       .then((fn) => {
+        if (cancelled) {
+          fn();
+          return;
+        }
         unlisten = fn;
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('[Editor] onNoteChanged subscribe failed:', err);
       });
     return () => {
+      cancelled = true;
       if (unlisten) unlisten();
     };
-  }, [activePath, content]);
+  }, [activePath]);
+
+  // 卸载时清理 saveTimer，防止组件卸载后仍尝试写文件
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+      }
+    };
+  }, []);
 
   // 防抖保存
   const handleChange = useCallback(

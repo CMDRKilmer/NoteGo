@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import { MermaidBlock } from './MermaidBlock';
 import { Callout } from './Callout';
 import { WikiLink } from './WikiLinkRenderer';
@@ -17,7 +17,7 @@ interface Props {
  *
  * - 启用 GFM（表格 / 任务列表 / 删除线）
  * - 启用 KaTeX 数学公式
- * - 启用原始 HTML（rehype-raw，谨慎使用）
+ * - 启用 rehype-sanitize（白名单清洗原始 HTML，XSS 防护）
  * - 自定义 `code`：```mermaid`` 走 MermaidBlock
  * - 自定义 `blockquote`：识别 `[!note]` / `[!warning]` 等 Callout 语法
  * - 自定义 `a`：识别 `notego://wiki/*` 走 WikiLink 渲染
@@ -28,7 +28,7 @@ export function MarkdownView({ content }: Props): JSX.Element {
     <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex, rehypeRaw]}
+        rehypePlugins={[rehypeKatex, rehypeSanitize]}
         components={{
           code(props) {
             const { className, children, ...rest } = props as {

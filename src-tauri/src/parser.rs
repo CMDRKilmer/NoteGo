@@ -96,7 +96,7 @@ const CONTEXT_MAX: usize = 200;
 /// 4. 合并 Front Matter 的 `tags` 与正文 `tags`，按首次出现去重
 pub fn parse(content: &str) -> Result<ParsedNote> {
     // 1) 切分 Front Matter
-    let (fm_raw, body) = split_front_matter(content);
+    let (fm_raw, body) = split_front_matter(content).unwrap_or(("", content));
 
     // 2) 解析 Front Matter
     let front_matter = parse_front_matter(fm_raw);
