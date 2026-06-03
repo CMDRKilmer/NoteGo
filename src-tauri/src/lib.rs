@@ -1,7 +1,7 @@
 //! NoteGo 库入口
 //!
 //! 启动 Tauri 2.x 应用，注册：
-//!   - 官方插件：dialog / fs / store / updater
+//!   - 官方插件：dialog / updater
 //!   - 业务命令：见 `commands` 模块
 //!
 //! 子模块：
@@ -39,8 +39,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(VaultState::default())
         .manage(WatcherSlot::default())
