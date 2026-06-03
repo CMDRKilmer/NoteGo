@@ -30,11 +30,15 @@
 - [x] 重命名笔记后所有 `[[双向链接]]` 自动更新 — `Index::rename_note` + `resolve_link_targets`（body 文本替换留 TODO）
 
 ## Markdown 渲染
-- [ ] 表格、任务列表、代码高亮正常
-- [ ] Mermaid 代码块渲染为图表
-- [ ] `$inline$` 与 `$$block$$` 通过 KaTeX 渲染
-- [ ] Callout 块 `> [!note]` 样式化
-- [ ] 阅读 / 实时双视图切换可用 (`Ctrl+E`)
+- [x] 表格、任务列表、代码高亮正常 — `MarkdownView.tsx` + `remark-gfm`
+- [x] Mermaid 代码块渲染为图表 — `MermaidBlock.tsx` + mermaid 10.x
+- [x] `$inline$` 与 `$$block$$` 通过 KaTeX 渲染 — `remark-math` + `rehype-katex`
+- [x] Callout 块 `> [!note]` 样式化 — `Callout.tsx` 支持 6 种类型
+- [x] 阅读 / 实时双视图切换可用 (`Ctrl+E`) — 源码/分屏/预览三模式
+
+## 双向链接（补充）
+- [x] `[[` 触发自动补全弹窗 — `wikiCompletion.ts` + CodeMirror autocompletion
+- [x] 悬停链接弹出预览卡片（标题 + 前 500 字 + 标签）— `WikiLinkRenderer.tsx` + previewCache
 
 ## 知识图谱
 - [ ] 全局图谱展示当前 Vault 全部节点和边

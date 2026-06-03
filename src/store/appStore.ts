@@ -21,6 +21,8 @@ interface AppState {
   setNotes: (notes: NoteRecord[]) => void;
   /** 切换当前编辑笔记 */
   setActivePath: (path: string | null) => void;
+  /** 打开一篇笔记（设置 activePath 别名） */
+  openNote: (path: string) => void;
   /** 单条 upsert（按 path 匹配） */
   upsertNote: (note: NoteRecord) => void;
   /** 按 path 删除 */
@@ -35,6 +37,7 @@ export const useAppStore = create<AppState>((set) => ({
   setVault: (vault) => set({ vault, activePath: null }),
   setNotes: (notes) => set({ notes }),
   setActivePath: (activePath) => set({ activePath }),
+  openNote: (path) => set({ activePath: path }),
 
   upsertNote: (note) =>
     set((s) => {

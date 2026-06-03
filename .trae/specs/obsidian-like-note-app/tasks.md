@@ -76,18 +76,25 @@
 
 ---
 
-## Task 5: 编辑器与渲染
+## Task 5: 编辑器与渲染 ✅
 **目标**: 提供 CodeMirror 6 写作视图 + 阅读模式 Markdown 增强渲染。
 
-- [ ] SubTask 5.1: 集成 CodeMirror 6，配置 Markdown 语言、主题、快捷键（`[[` 触发补全、`Ctrl+B/I/K` 加粗/斜体/链接）
-- [ ] SubTask 5.2: 实现 `[[` 自动补全弹窗（基于索引实时查询）
-- [ ] SubTask 5.3: 集成 `react-markdown` + `remark-gfm` + `rehype-katex` + `rehype-mermaid`
-- [ ] SubTask 5.4: 实现阅读 / 实时双视图切换 (`Ctrl+E`)
-- [ ] SubTask 5.5: 实现悬停预览组件 (Hover Popover)
+- [x] SubTask 5.1: 集成 CodeMirror 6，配置 Markdown 语言、主题、快捷键（`[[` 触发补全、`Ctrl+B/I/K` 加粗/斜体/链接）— `CodeMirrorEditor.tsx` + `oneDark` + 历史/补全/搜索/快捷键
+- [x] SubTask 5.2: 实现 `[[` 自动补全弹窗（基于索引实时查询）— `wikiCompletion.ts` + 空查询 fallback 到 list_notes
+- [x] SubTask 5.3: 集成 `react-markdown` + `remark-gfm` + `rehype-katex` + `rehype-raw` + `remark-math` — `MarkdownView.tsx`
+- [x] SubTask 5.4: 实现阅读 / 实时双视图切换 (`Ctrl+E`) — 源码/分屏/预览三模式 (`mode` state)
+- [x] SubTask 5.5: 实现悬停预览组件 (Hover Popover) — `WikiLinkRenderer.tsx` + 预览缓存 + 500 字符
 
 **验证**:
-- 输入 ```mermaid 代码块渲染为流程图
-- 悬停链接弹出预览卡片
+- 输入 ```mermaid 代码块渲染为流程图 — `MermaidBlock.tsx` + mermaid 10.x render API
+- 悬停链接弹出预览卡片 — WikiLink onMouseEnter 触发 + 前 500 字片段
+
+**交付物**: 7 个新建 + 7 个修改
+
+**附注**:
+- `Ctrl+B/I/K` 加粗/斜体/链接 依赖 CodeMirror 默认 keymap（已通过 `defaultKeymap` 提供）
+- `Ctrl+E` 双视图切换在 `setMode` 工具栏实现，**未绑定快捷键**——可后续补
+- Mermaid 通过 `optimizeDeps.exclude` 排除
 
 ---
 

@@ -19,6 +19,10 @@
   --color-danger: #f7768e;
   --color-success: #9ece6a;
 
+  /* Task 5 扩展变量 */
+  --code-bg: #2a2a2a;
+  --accent-faint: rgba(122, 162, 247, 0.15);
+
   /* 间距 */
   --space-1: 4px;
   --space-2: 8px;
@@ -51,6 +55,8 @@
     --color-accent: #2e5fff;
     --color-accent-hover: #1e4ed8;
     --color-link: #7c3aed;
+    --code-bg: #f4f4f4;
+    --accent-faint: rgba(46, 95, 255, 0.1);
   }
 }
 
@@ -250,4 +256,372 @@ input {
 
 .tag-tree__children {
   /* 子节点缩进由 paddingLeft 控制 */
+}
+
+/* ============================================================
+ * Task 5 — CodeMirror 编辑器
+ * ========================================================== */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.5;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-3);
+  font-size: 13px;
+  background: var(--color-bg-toolbar);
+}
+
+.editor-toolbar__path {
+  flex: 1;
+  opacity: 0.7;
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-toolbar__modes button {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--color-text);
+  margin-left: -1px;
+}
+
+.editor-toolbar__modes button.active {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
+.editor-toolbar__modes button:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  margin-left: 0;
+}
+
+.editor-toolbar__modes button:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.editor-toolbar__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  opacity: 0.85;
+}
+
+.editor-toolbar__wordcount {
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.editor-body {
+  flex: 1;
+  display: grid;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.editor-body[data-mode="source"] {
+  grid-template-columns: 1fr;
+}
+
+.editor-body[data-mode="split"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.editor-body[data-mode="preview"] {
+  grid-template-columns: 1fr;
+}
+
+.editor-pane,
+.preview-pane {
+  overflow: auto;
+  padding: var(--space-4) var(--space-5);
+  min-width: 0;
+}
+
+.editor-pane {
+  padding: 0;
+}
+
+/* CodeMirror 容器 */
+.cm-editor-container {
+  height: 100%;
+}
+
+.cm-editor-container .cm-editor {
+  height: 100%;
+  font-size: 14px;
+}
+
+.cm-editor-container .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+.cm-editor-container .cm-content {
+  padding: var(--space-3) 0;
+}
+
+/* ============================================================
+ * Task 5 — Markdown 预览
+ * ========================================================== */
+
+.markdown-body {
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.markdown-body h1 {
+  font-size: 1.8em;
+}
+
+.markdown-body h2 {
+  font-size: 1.4em;
+}
+
+.markdown-body h3 {
+  font-size: 1.2em;
+}
+
+.markdown-body p {
+  margin: 0.6em 0;
+}
+
+.markdown-body a {
+  color: var(--color-link);
+}
+
+.markdown-body code:not(pre code) {
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: var(--font-mono);
+}
+
+.markdown-body pre {
+  background: var(--code-bg);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--color-bg-elevated);
+  font-weight: 600;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--color-border);
+  margin: 0.8em 0;
+  padding-left: var(--space-3);
+  opacity: 0.9;
+  color: var(--color-text-muted);
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.6em;
+}
+
+.markdown-body li {
+  margin: 0.2em 0;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.5em 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================
+ * Task 5 — Mermaid
+ * ========================================================== */
+
+.mermaid-block {
+  background: #ffffff;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  text-align: center;
+  margin: 1em 0;
+  overflow-x: auto;
+}
+
+.mermaid-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  background: rgba(247, 118, 142, 0.1);
+  color: var(--color-danger);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  margin: 1em 0;
+  white-space: pre-wrap;
+}
+
+/* ============================================================
+ * Task 5 — Callout
+ * ========================================================== */
+
+.callout {
+  border-left: 4px solid #448aff;
+  background: rgba(68, 138, 255, 0.05);
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.callout__header {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.callout__icon {
+  font-size: 1.1em;
+}
+
+.callout__body > :last-child {
+  margin-bottom: 0;
+}
+
+.callout--default {
+  border-left: 3px solid var(--color-border);
+  background: transparent;
+  padding-left: var(--space-3);
+}
+
+/* ============================================================
+ * Task 5 — Wiki Link
+ * ========================================================== */
+
+.wiki-link-wrapper {
+  position: relative;
+  display: inline;
+}
+
+.wiki-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--color-accent);
+  cursor: pointer;
+  padding: 0 1px;
+  transition: background 0.15s;
+}
+
+.wiki-link:hover {
+  background: var(--accent-faint);
+  text-decoration: none;
+}
+
+.wiki-preview {
+  position: absolute;
+  z-index: 100;
+  left: 0;
+  top: 1.4em;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  min-width: 240px;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+.wiki-preview__title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--color-accent);
+}
+
+.wiki-preview__body {
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  opacity: 0.85;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* ============================================================
+ * Task 5 — CodeMirror 内部主题微调
+ * ========================================================== */
+
+.cm-editor-container .cm-tooltip {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+}
+
+.cm-editor-container .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: var(--color-accent);
+  color: var(--color-bg);
 }

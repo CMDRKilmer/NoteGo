@@ -29,4 +29,9 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_DEBUG,
   },
+  optimizeDeps: {
+    // Mermaid 体积较大且自身包含复杂依赖图，交给 Vite 直接预构建可能
+    // 触发重复依赖 / ESM 兼容问题。排除后由 Vite 在首次访问时按需加载。
+    exclude: ["mermaid"],
+  },
 }));

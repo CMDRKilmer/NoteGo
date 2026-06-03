@@ -67,9 +67,23 @@ export const ipc = {
   /**
    * FTS5 全文搜索。最多返回 50 条结果，按相关性排序。
    * 支持 FTS5 语法：`AND` / `OR` / `NEAR` / 前缀 `*` 等。
+   *
+   * 若传入空字符串或纯空白，则 fallback 为 list_notes 并取前 50 条
+   * （用于 CodeMirror `[[wiki]]` 补全源的初始候选）。
    */
-  searchNotes: (query: string): Promise<SearchHit[]> =>
-    invoke<SearchHit[]>('search_notes', { query }),
+  searchNotes: async (query: string): Promise<SearchHit[]> => {
+    if (!query.trim()) {
+      const notes = await invoke<NoteRecord[]>('list_notes');
+      return notes.slice(0, 50).map((n) => ({
+        id: n.id,
+        path: n.path,
+        title: n.title,
+        snippet: '',
+        rank: 0,
+      }));
+    }
+    return invoke<SearchHit[]>('search_notes', { query });
+  },
 
   /**
    * 全量重建索引。返回重建后的笔记总数。
