@@ -358,17 +358,20 @@ impl Index {
     }
 
     /// FTS5 全文搜索。`query` 使用 FTS5 语法（支持 `AND` / `OR` / `NEAR` / 前缀 `*`）。
+    ///
+    /// **安全**：用户输入会被包裹为 FTS5 phrase（`"..."`），内部 `"` 转义为 `""`，
+    /// 控制字符过滤。这样 FTS5 总是把 query 视为字面量，不会因 `*` `:` `(` 等
+    /// 触发语法解析错误，也不会被注入 `MATCH` 子句。
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>> {
         let q = query.trim();
         if q.is_empty() {
             return Ok(Vec::new());
         }
         let conn = self.conn.lock().expect("index 锁中毒");
-        // 1) 简单 query 转义：避免 `'` 注入
-        let sanitized = q.replace('\'', "''");
-        // 2) 搜索：snippet 列号 -1 = 命中列自适应；标记符 X'01' / X'02' 供前端 `<mark>` 渲染
-        //    使用 FTS5 内置 `rank` 列（升序 = 相关性高），兼容 SQLite 3.41+ 旧版 FTS5；
-        //    若升级到 3.45+ 可改用 `bm25(notes_fts)` 以获得更精准的 BM25 排序。
+        let phrase = safe_fts5_phrase(q);
+        // snippet 列号 -1 = 命中列自适应；标记符 X'01' / X'02' 供前端 `<mark>` 渲染
+        // 使用 FTS5 内置 `rank` 列（升序 = 相关性高），兼容 SQLite 3.41+ 旧版 FTS5；
+        // 若升级到 3.45+ 可改用 `bm25(notes_fts)` 以获得更精准的 BM25 排序。
         let sql = format!(
             "SELECT n.id, n.path, n.title, snippet(notes_fts, -1, X'01', X'02', '…', 12) AS snip,\
                     rank AS score\
@@ -377,7 +380,7 @@ impl Index {
              ORDER BY score LIMIT ?2"
         );
         let mut stmt = conn.prepare(&sql)?;
-        let mut rows = stmt.query(params![sanitized, limit as i64])?;
+        let mut rows = stmt.query(params![phrase, limit as i64])?;
         let mut out = Vec::new();
         while let Some(row) = rows.next()? {
             out.push(SearchHit {
@@ -456,8 +459,8 @@ impl Index {
         {
             return Ok(Some(p));
         }
-        // 3) path 包含
-        let pattern = format!("%{}%", target.replace('\\', "\\\\"));
+        // 3) path 包含（LIKE 模式已用 ESCAPE '\\' 转义 `%` `_` `\`）
+        let pattern = format!("%{}%", like_escape(target));
         if let Some(p) = conn
             .query_row(
                 "SELECT path FROM notes WHERE path LIKE ?1 ESCAPE '\\' LIMIT 1",
@@ -521,5 +524,56 @@ fn extract_line_snippet(body: &str, line: i64) -> String {
             }
         }
         None => String::new(),
+    }
+}
+
+/// FTS5 安全短语：用户输入包成 `"..."`（phrase 语法），内部 `"` 替换为 `""`。
+///
+/// FTS5 在遇到带引号的 token 时会**整段当作字面量**解析，不再尝试语法分析：
+///   - 不再识别 `AND` / `OR` / `NOT` / `NEAR` / `*` 等操作符
+///   - 不再把 `:` `(` `)` `^` 等解释为列前缀或权值
+///   - `"` 字符通过 `""` 转义（SQLite FTS5 字符串字面量规则）
+///
+/// 同时过滤 ASCII / Unicode 控制字符，防止 0x00 / 换行污染 MATCH 解析。
+fn safe_fts5_phrase(q: &str) -> String {
+    let cleaned: String = q.chars().filter(|c| !c.is_control()).collect();
+    format!("\"{}\"", cleaned.replace('"', "\"\""))
+}
+
+/// LIKE 模式转义：转义 `\`（ESCAPE 字符本身）、`%`、`_` 三个特殊字符。
+///
+/// 调用方 SQL 必须使用 `LIKE ? ESCAPE '\'`，否则转义会被忽略。
+fn like_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fts5_phrase_wraps_and_escapes() {
+        assert_eq!(safe_fts5_phrase("hello"), "\"hello\"");
+        assert_eq!(safe_fts5_phrase("a\"b"), "\"a\"\"b\"");
+        assert_eq!(safe_fts5_phrase("a*b"), "\"a*b\"");
+        assert_eq!(safe_fts5_phrase("a OR b"), "\"a OR b\"");
+        // 控制字符被过滤
+        assert_eq!(safe_fts5_phrase("a\nb\tc"), "\"abc\"");
+    }
+
+    #[test]
+    fn like_escape_handles_specials() {
+        assert_eq!(like_escape("plain"), "plain");
+        assert_eq!(like_escape("a%b"), "a\\%b");
+        assert_eq!(like_escape("a_b"), "a\\_b");
+        assert_eq!(like_escape("a\\b"), "a\\\\b");
+        assert_eq!(like_escape("a%_\\b"), "a\\%\\_\\\\b");
     }
 }

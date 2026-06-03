@@ -15,6 +15,7 @@
 //! 打开时打开索引并触发全量重建；CRUD 同步更新索引。
 
 use anyhow::{Context, Result};
+use blake3::Hasher as Blake3;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -202,7 +203,7 @@ impl Vault {
     }
 
     /// 写文件的内部实现（不触发索引更新），便于 `rename_note` 等复合操作复用。
-    async fn write_note_inner(&self, rel_path: &str, content: &str) -> Result<()> {
+    pub async fn write_note_inner(&self, rel_path: &str, content: &str) -> Result<()> {
         let full = self.resolve(rel_path)?;
         if let Some(parent) = full.parent() {
             tokio::fs::create_dir_all(parent).await.with_context(|| {
@@ -263,14 +264,20 @@ impl Vault {
 
     /// 删除笔记（文件不存在时忽略），并清理索引。
     pub async fn delete_note(&self, rel_path: &str) -> Result<()> {
+        self.delete_note_inner(rel_path).await?;
+        if let Err(e) = self.index.remove_note_by_path(rel_path) {
+            tracing::warn!("清理索引失败（delete_note）: {e}");
+        }
+        Ok(())
+    }
+
+    /// 删除文件（不存在时忽略），不触发索引更新。
+    pub async fn delete_note_inner(&self, rel_path: &str) -> Result<()> {
         let full = self.resolve(rel_path)?;
         match tokio::fs::remove_file(&full).await {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e).with_context(|| format!("删除笔记失败: {}", full.display())),
-        }
-        if let Err(e) = self.index.remove_note_by_path(rel_path) {
-            tracing::warn!("清理索引失败（delete_note）: {e}");
         }
         Ok(())
     }
@@ -285,6 +292,20 @@ impl Vault {
     /// 文本侧（TODO，未实现）：扫描所有笔记正文，把 `[[old]]` 替换为 `[[new]]` 并写回。
     /// 成本较高（需遍历全库），留作后续 Task。
     pub async fn rename_note(&self, old_rel: &str, new_rel: &str) -> Result<()> {
+        self.rename_note_inner(old_rel, new_rel).await?;
+        // 同步索引：先更新自身 path，再批量更新指向该路径的 links.to_path
+        if let Err(e) = self.index.rename_note(old_rel, new_rel) {
+            tracing::warn!("更新索引失败（rename_note notes）: {e}");
+        }
+        if let Err(e) = self.index.resolve_link_targets(old_rel, new_rel) {
+            tracing::warn!("更新 links 引用失败（rename_note）: {e}");
+        }
+        // TODO (Task 4.6 后续增强): 扫描所有笔记 body，把 [[old]] 替换为 [[new]] 并写回。
+        Ok(())
+    }
+
+    /// 文件 rename/move（不可跨出 Vault 根），不触发索引更新。
+    pub async fn rename_note_inner(&self, old_rel: &str, new_rel: &str) -> Result<()> {
         let old = self.resolve(old_rel)?;
         let new = self.resolve(new_rel)?;
         if !old.exists() {
@@ -296,14 +317,6 @@ impl Vault {
         tokio::fs::rename(&old, &new)
             .await
             .with_context(|| format!("重命名失败: {} -> {}", old.display(), new.display()))?;
-        // 同步索引：先更新自身 path，再批量更新指向该路径的 links.to_path
-        if let Err(e) = self.index.rename_note(old_rel, new_rel) {
-            tracing::warn!("更新索引失败（rename_note notes）: {e}");
-        }
-        if let Err(e) = self.index.resolve_link_targets(old_rel, new_rel) {
-            tracing::warn!("更新 links 引用失败（rename_note）: {e}");
-        }
-        // TODO (Task 4.6 后续增强): 扫描所有笔记 body，把 [[old]] 替换为 [[new]] 并写回。
         Ok(())
     }
 
@@ -394,7 +407,8 @@ impl Vault {
 /// 笔记元数据（不含正文，供前端列表 / 文件树渲染）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoteRecord {
-    /// 稳定 ID：使用文件路径 SHA-256 前 8 字节 -> i64
+    /// 稳定 ID：`blake3(rel_path)` 前 8 字节 -> i64。
+    /// 与内容 hash 解耦，笔记内容更新不会触发 CASCADE 重写 tags / links。
     pub id: i64,
     /// 相对 Vault 根的 POSIX 路径
     pub path: String,
@@ -409,6 +423,10 @@ pub struct NoteRecord {
 }
 
 /// 从文件元数据构造 `NoteRecord`（读 mtime / size / content hash）。
+///
+/// ID 生成策略：取 `blake3(rel_path)` 前 8 字节，**只依赖路径**。
+/// 同一路径永远得到同一 ID → 内容修改时 `upsert_note` 用 `INSERT OR REPLACE`
+/// 走相同的 PRIMARY KEY，不会触发 `tags` / `links` 的 CASCADE 重写。
 pub(crate) fn build_record(root: &Path, full: &Path) -> Result<NoteRecord> {
     let meta = std::fs::metadata(full)
         .with_context(|| format!("读取元数据失败: {}", full.display()))?;
@@ -424,12 +442,20 @@ pub(crate) fn build_record(root: &Path, full: &Path) -> Result<NoteRecord> {
         .map(|d| d.as_millis() as i64)
         .unwrap_or_else(|| Utc::now().timestamp_millis());
     let size = meta.len() as i64;
+    // 内容 hash（仅用于脏检查，不参与 ID）
     let bytes = std::fs::read(full).unwrap_or_default();
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     let hash = hex::encode(hasher.finalize());
-    // 稳定 ID：取 hash 前 8 字节 -> i64
-    let id = i64::from_be_bytes(hash.as_bytes()[..8].try_into().unwrap_or([0; 8]));
+    // 稳定 ID：blake3(rel_path) 前 8 字节 -> i64
+    let id = {
+        let mut h = Blake3::new();
+        h.update(rel.as_bytes());
+        let digest = h.finalize();
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(&digest.as_bytes()[..8]);
+        i64::from_be_bytes(buf)
+    };
     let title = full
         .file_stem()
         .and_then(|s| s.to_str())

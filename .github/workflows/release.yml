@@ -43,8 +43,8 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm@9
 
-      - name: Install Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust (pinned stable)
+        uses: dtolnay/rust-toolchain@1.82.0
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
